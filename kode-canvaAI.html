@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Topologi Bintang Dinamis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .diagram-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #3498db;
+        }
+
+        .title {
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .simulation-toggle {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .simulation-toggle:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .simulation-toggle.active {
+            background: #e74c3c;
+        }
+
+        .network-diagram {
+            position: relative;
+            width: 100%;
+            height: 700px;
+            margin: 0 auto;
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .device {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 5;
+        }
+
+        .device:hover {
+            transform: scale(1.08);
+            z-index: 10;
+        }
+
+        .device-icon {
+            width: 85px;
+            height: 85px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 38px;
+            margin-bottom: 10px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            border: 3px solid #fff;
+        }
+
+        .device-label {
+            background: #34495e;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 85px;
+            white-space: nowrap;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Perfect star topology positioning */
+        .switch {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .router {
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .internet {
+            top: 2%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .laptop {
+            top: 25%;
+            left: 18%;
+        }
+
+        .smartphone {
+            top: 75%;
+            left: 18%;
+        }
+
+        .desktop {
+            top: 25%;
+            right: 18%;
+        }
+
+        .printer {
+            top: 75%;
+            right: 18%;
+        }
+
+        .server {
+            bottom: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .access-point {
+            top: 50%;
+            left: 32%;
+            transform: translateY(-50%);
+        }
+
+        /* Device colors */
+        .internet .device-icon { background: #87ceeb; color: #2c3e50; }
+        .router .device-icon { background: #1abc9c; color: white; }
+        .switch .device-icon { background: #3498db; color: white; }
+        .laptop .device-icon { background: #9b59b6; color: white; }
+        .smartphone .device-icon { background: #e74c3c; color: white; }
+        .desktop .device-icon { background: #2ecc71; color: white; }
+        .printer .device-icon { background: #f39c12; color: white; }
+        .server .device-icon { background: #34495e; color: white; }
+        .access-point .device-icon { background: #e67e22; color: white; }
+
+        /* Connection lines */
+        .connection {
+            position: absolute;
+            height: 4px;
+            transform-origin: left center;
+            z-index: 1;
+            border-radius: 2px;
+        }
+
+        .wired {
+            background: #27ae60;
+            box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+        }
+
+        .wireless {
+            background: #e74c3c;
+            box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+        }
+
+        /* Animated data packets */
+        .data-packet {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            z-index: 10;
+            opacity: 0;
+        }
+
+        .data-packet.wired {
+            background: #2ecc71;
+            box-shadow: 0 0 12px rgba(46, 204, 113, 0.8);
+        }
+
+        .data-packet.wireless {
+            background: #e74c3c;
+            box-shadow: 0 0 12px rgba(231, 76, 60, 0.8);
+        }
+
+        .data-packet.active {
+            opacity: 1;
+            animation: packetGlow 0.8s ease-in-out infinite alternate;
+        }
+
+        @keyframes packetGlow {
+            0% { transform: scale(1); box-shadow: 0 0 12px rgba(46, 204, 113, 0.8); }
+            100% { transform: scale(1.4); box-shadow: 0 0 20px rgba(46, 204, 113, 1); }
+        }
+
+        /* Pulsing connection animation */
+        .connection.animated {
+            animation: connectionPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes connectionPulse {
+            0%, 100% { 
+                opacity: 0.8; 
+                height: 4px;
+                box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+            }
+            50% { 
+                opacity: 1; 
+                height: 6px;
+                box-shadow: 0 4px 16px rgba(39, 174, 96, 0.6);
+            }
+        }
+
+        .connection.wireless.animated {
+            animation: wirelessPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes wirelessPulse {
+            0%, 100% { 
+                opacity: 0.8; 
+                height: 4px;
+                box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+            }
+            50% { 
+                opacity: 1; 
+                height: 6px;
+                box-shadow: 0 4px 16px rgba(231, 76, 60, 0.6);
+            }
+        }
+
+        /* Legend */
+        .legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .legend h3 {
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .legend-line {
+            width: 35px;
+            height: 4px;
+            margin-right: 15px;
+            border-radius: 2px;
+        }
+
+        .legend-wired { background: #27ae60; }
+        .legend-wireless { background: #e74c3c; }
+
+        .legend-packet {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 20px;
+            animation: packetGlow 1s ease-in-out infinite alternate;
+        }
+
+        /* Status indicator */
+        .status-indicator {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #2ecc71;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+        }
+
+        /* Info panel */
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #3498db;
+            max-width: 350px;
+        }
+
+        .info-panel h4 {
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .info-panel p {
+            color: #7f8c8d;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .diagram-container {
+                padding: 20px;
+            }
+            
+            .network-diagram {
+                height: 600px;
+            }
+            
+            .device-icon {
+                width: 70px;
+                height: 70px;
+                font-size: 30px;
+            }
+            
+            .title {
+                font-size: 22px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="diagram-container">
+        <div class="header">
+            <h1 class="title">Simulasi Topologi Bintang Dinamis</h1>
+            <button class="simulation-toggle" id="simulationBtn">🚀 Mulai Simulasi</button>
+        </div>
+        
+        <div class="network-diagram">
+            <!-- Status Indicator -->
+            <div class="status-indicator">🌟 Jaringan Bintang Aktif</div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <h3>Keterangan</h3>
+                <div class="legend-item">
+                    <div class="legend-line legend-wired"></div>
+                    <span>Kabel Ethernet</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line legend-wireless"></div>
+                    <span>Koneksi Wi-Fi</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-packet" style="background: #2ecc71;"></div>
+                    <span>Data Packet</span>
+                </div>
+            </div>
+
+            <!-- Info Panel -->
+            <div class="info-panel">
+                <h4>Topologi Bintang</h4>
+                <p id="infoText">Switch sebagai pusat koneksi menghubungkan semua perangkat. Klik "Mulai Simulasi" untuk melihat aliran data dinamis melalui jaringan.</p>
+            </div>
+
+            <!-- Internet -->
+            <div class="device internet">
+                <div class="device-icon">🌐</div>
+                <div class="device-label">Internet</div>
+            </div>
+
+            <!-- Router -->
+            <div class="device router">
+                <div class="device-icon">📡</div>
+                <div class="device-label">Router</div>
+            </div>
+
+            <!-- Central Switch -->
+            <div class="device switch">
+                <div class="device-icon">🔄</div>
+                <div class="device-label">Switch</div>
+            </div>
+
+            <!-- Left side devices -->
+            <div class="device laptop">
+                <div class="device-icon">💻</div>
+                <div class="device-label">Laptop</div>
+            </div>
+
+            <div class="device smartphone">
+                <div class="device-icon">📱</div>
+                <div class="device-label">Smartphone</div>
+            </div>
+
+            <!-- Right side devices -->
+            <div class="device desktop">
+                <div class="device-icon">🖥️</div>
+                <div class="device-label">PC Desktop</div>
+            </div>
+
+            <div class="device printer">
+                <div class="device-icon">🖨️</div>
+                <div class="device-label">Printer</div>
+            </div>
+
+            <!-- Bottom device -->
+            <div class="device server">
+                <div class="device-icon">🗄️</div>
+                <div class="device-label">Server</div>
+            </div>
+
+            <!-- Access Point -->
+            <div class="device access-point">
+                <div class="device-icon">📶</div>
+                <div class="device-label">Access Point</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let simulationActive = false;
+        let connections = [];
+        let animationIntervals = [];
+
+        // Function to create connection lines between devices
+        function createConnection(from, to, type) {
+            const fromElement = document.querySelector(`.${from}`);
+            const toElement = document.querySelector(`.${to}`);
+            
+            if (!fromElement || !toElement) return null;
+            
+            const fromRect = fromElement.getBoundingClientRect();
+            const toRect = toElement.getBoundingClientRect();
+            const containerRect = document.querySelector('.network-diagram').getBoundingClientRect();
+            
+            // Calculate center positions relative to container
+            const fromX = fromRect.left + fromRect.width / 2 - containerRect.left;
+            const fromY = fromRect.top + fromRect.height / 2 - containerRect.top;
+            const toX = toRect.left + toRect.width / 2 - containerRect.left;
+            const toY = toRect.top + toRect.height / 2 - containerRect.top;
+            
+            // Calculate line properties
+            const deltaX = toX - fromX;
+            const deltaY = toY - fromY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+            
+            // Create line element
+            const line = document.createElement('div');
+            line.className = `connection ${type}`;
+            line.style.width = distance + 'px';
+            line.style.left = fromX + 'px';
+            line.style.top = fromY + 'px';
+            line.style.transform = `rotate(${angle}deg)`;
+            
+            document.querySelector('.network-diagram').appendChild(line);
+            
+            return {
+                element: line,
+                from: from,
+                to: to,
+                type: type,
+                fromX: fromX,
+                fromY: fromY,
+                toX: toX,
+                toY: toY,
+                distance: distance,
+                angle: angle
+            };
+        }
+
+        // Draw all connections
+        function drawConnections() {
+            // Remove existing connections
+            const existingConnections = document.querySelectorAll('.connection');
+            existingConnections.forEach(conn => conn.remove());
+            connections = [];
+            
+            // Wait for layout to settle
+            setTimeout(() => {
+                // Internet to Router
+                connections.push(createConnection('internet', 'router', 'wired'));
+                
+                // Router to Switch
+                connections.push(createConnection('router', 'switch', 'wired'));
+                
+                // Switch to wired devices
+                connections.push(createConnection('switch', 'desktop', 'wired'));
+                connections.push(createConnection('switch', 'printer', 'wired'));
+                connections.push(createConnection('switch', 'server', 'wired'));
+                connections.push(createConnection('switch', 'access-point', 'wired'));
+                
+                // Access Point to wireless devices
+                connections.push(createConnection('access-point', 'laptop', 'wireless'));
+                connections.push(createConnection('access-point', 'smartphone', 'wireless'));
+                
+                // Filter out null connections
+                connections = connections.filter(conn => conn !== null);
+            }, 100);
+        }
+
+        // Create animated data packet
+        function createDataPacket(connection, direction = 'forward') {
+            const packet = document.createElement('div');
+            packet.className = `data-packet ${connection.type} active`;
+            
+            const startX = direction === 'forward' ? connection.fromX : connection.toX;
+            const startY = direction === 'forward' ? connection.fromY : connection.toY;
+            const endX = direction === 'forward' ? connection.toX : connection.fromX;
+            const endY = direction === 'forward' ? connection.fromY : connection.toY;
+            
+            packet.style.left = (startX - 5) + 'px';
+            packet.style.top = (startY - 5) + 'px';
+            
+            document.querySelector('.network-diagram').appendChild(packet);
+            
+            // Animate packet movement
+            const duration = 1500 + Math.random() * 1000; // 1.5-2.5 seconds
+            const startTime = Date.now();
+            
+            function animatePacket() {
+                if (!simulationActive) {
+                    packet.remove();
+                    return;
+                }
+                
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Smooth easing function
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                const currentX = startX + (endX - startX) * easeProgress;
+                const currentY = startY + (endY - startY) * easeProgress;
+                
+                packet.style.left = (currentX - 5) + 'px';
+                packet.style.top = (currentY - 5) + 'px';
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animatePacket);
+                } else {
+                    packet.remove();
+                }
+            }
+            
+            requestAnimationFrame(animatePacket);
+        }
+
+        // Start dynamic simulation
+        function startSimulation() {
+            if (simulationActive) return;
+            
+            simulationActive = true;
+            const btn = document.getElementById('simulationBtn');
+            btn.classList.add('active');
+            btn.textContent = '⏹️ Hentikan Simulasi';
+            
+            document.getElementById('infoText').textContent = 'Simulasi aktif! Data mengalir dinamis melalui jaringan bintang. Paket hijau untuk kabel, merah untuk Wi-Fi.';
+            
+            // Add pulsing animation to connections
+            connections.forEach(conn => {
+                if (conn && conn.element) {
+                    conn.element.classList.add('animated');
+                }
+            });
+            
+            // Create data packets at regular intervals
+            const packetInterval = setInterval(() => {
+                if (!simulationActive) {
+                    clearInterval(packetInterval);
+                    return;
+                }
+                
+                // Send packets through random connections
+                const activeConnections = connections.filter(conn => conn !== null);
+                if (activeConnections.length === 0) return;
+                
+                // Send 2-4 packets simultaneously
+                const packetCount = Math.floor(Math.random() * 3) + 2;
+                for (let i = 0; i < packetCount; i++) {
+                    setTimeout(() => {
+                        if (!simulationActive) return;
+                        
+                        const randomConnection = activeConnections[Math.floor(Math.random() * activeConnections.length)];
+                        const direction = Math.random() > 0.5 ? 'forward' : 'backward';
+                        createDataPacket(randomConnection, direction);
+                    }, i * 150);
+                }
+            }, 1000);
+            
+            animationIntervals.push(packetInterval);
+        }
+
+        // Stop simulation
+        function stopSimulation() {
+            simulationActive = false;
+            
+            // Clear all intervals
+            animationIntervals.forEach(interval => clearInterval(interval));
+            animationIntervals = [];
+            
+            // Remove all packets
+            const packets = document.querySelectorAll('.data-packet');
+            packets.forEach(packet => packet.remove());
+            
+            // Remove connection animations
+            connections.forEach(conn => {
+                if (conn && conn.element) {
+                    conn.element.classList.remove('animated');
+                }
+            });
+            
+            // Reset button
+            const btn = document.getElementById('simulationBtn');
+            btn.classList.remove('active');
+            btn.textContent = '🚀 Mulai Simulasi';
+            
+            document.getElementById('infoText').textContent = 'Simulasi dihentikan. Switch sebagai pusat koneksi menghubungkan semua perangkat. Klik "Mulai Simulasi" untuk melihat aliran data dinamis.';
+        }
+
+        // Toggle simulation
+        function toggleSimulation() {
+            if (simulationActive) {
+                stopSimulation();
+            } else {
+                startSimulation();
+            }
+        }
+
+        // Event listeners
+        document.getElementById('simulationBtn').addEventListener('click', toggleSimulation);
+
+        // Draw connections when page loads
+        window.addEventListener('load', drawConnections);
+
+        // Redraw connections on window resize
+        window.addEventListener('resize', () => {
+            stopSimulation();
+            setTimeout(drawConnections, 100);
+        });
+
+        // Add device hover effects
+        document.querySelectorAll('.device').forEach(device => {
+            device.addEventListener('mouseenter', function() {
+                this.style.filter = 'drop-shadow(0 0 20px rgba(52, 152, 219, 0.8))';
+                
+                const deviceName = this.querySelector('.device-label').textContent;
+                const infoText = document.getElementById('infoText');
+                
+                switch(deviceName) {
+                    case 'Switch':
+                        infoText.textContent = 'Switch - Pusat topologi bintang yang menghubungkan semua perangkat dalam jaringan.';
+                        break;
+                    case 'Router':
+                        infoText.textContent = 'Router - Menghubungkan jaringan lokal dengan internet dan mengatur lalu lintas data.';
+                        break;
+                    case 'Access Point':
+                        infoText.textContent = 'Access Point - Menyediakan koneksi Wi-Fi untuk perangkat mobile seperti laptop dan smartphone.';
+                        break;
+                    default:
+                        infoText.textContent = `${deviceName} - Perangkat endpoint yang terhubung ke switch melalui jaringan bintang.`;
+                }
+            });
+            
+            device.addEventListener('mouseleave', function() {
+                this.style.filter = '';
+                if (!simulationActive) {
+                    document.getElementById('infoText').textContent = 'Switch sebagai pusat koneksi menghubungkan semua perangkat. Klik "Mulai Simulasi" untuk melihat aliran data dinamis melalui jaringan.';
+                }
+            });
+        });
+
+        // Add click animation for devices
+        document.querySelectorAll('.device').forEach(device => {
+            device.addEventListener('click', function() {
+                this.style.animation = 'deviceClick 0.6s ease-in-out';
+                setTimeout(() => {
+                    this.style.animation = '';
+                }, 600);
+            });
+        });
+
+        // Add device click animation
+        const clickStyle = document.createElement('style');
+        clickStyle.textContent = `
+            @keyframes deviceClick {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.15); box-shadow: 0 0 30px rgba(52, 152, 219, 1); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(clickStyle);
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97a676763037fde7',t:'MTc1NzA4MzAyNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
